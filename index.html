@@ -22,6 +22,13 @@
     --linea: rgba(240, 234, 221, .18);
     --acento: #D9A441;
   }
+  html[data-theme="purple"] {
+    --fondo: #57083c;
+    --tinta: #F7EAF6;
+    --suave: rgba(247, 234, 246, .7);
+    --linea: rgba(247, 234, 246, .2);
+    --acento: #E0A0D0;
+  }
   @media (prefers-color-scheme: dark) {
     html[data-theme="auto"] {
       --fondo: #12202E;
@@ -113,7 +120,7 @@
   var lugar = P.get('label') || '';
   var doc = document.documentElement;
 
-  doc.dataset.theme = ['light', 'dark', 'auto'].indexOf(P.get('theme')) > -1 ? P.get('theme') : 'auto';
+  doc.dataset.theme = ['light', 'dark', 'auto', 'purple'].indexOf(P.get('theme')) > -1 ? P.get('theme') : 'auto';
   if (P.get('bg') === 'none') doc.dataset.bg = 'none';
   doc.lang = lang.slice(0, 2);
 
