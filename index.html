@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="es" data-theme="auto">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Reloj</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --fondo: #F0EADD;
+    --tinta: #12202E;
+    --suave: rgba(18, 32, 46, .45);
+    --linea: rgba(18, 32, 46, .14);
+    --acento: #B07C25;
+  }
+  html[data-theme="dark"] {
+    --fondo: #12202E;
+    --tinta: #F0EADD;
+    --suave: rgba(240, 234, 221, .5);
+    --linea: rgba(240, 234, 221, .18);
+    --acento: #D9A441;
+  }
+  @media (prefers-color-scheme: dark) {
+    html[data-theme="auto"] {
+      --fondo: #12202E;
+      --tinta: #F0EADD;
+      --suave: rgba(240, 234, 221, .5);
+      --linea: rgba(240, 234, 221, .18);
+      --acento: #D9A441;
+    }
+  }
+  html[data-bg="none"], html[data-bg="none"] body { background: transparent; }
+
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  html { background: var(--fondo); }
+  body {
+    display: grid;
+    place-items: center;
+    padding: 4vmin;
+    color: var(--tinta);
+    font-family: "Cormorant Garamond", Garamond, "Times New Roman", serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  /* Cuando los dígitos son árabe-orientales o persas, manda la tipografía naskh */
+  html[data-script="arabe"] body {
+    font-family: "Amiri", "Noto Naskh Arabic", "Geeza Pro", "Times New Roman", serif;
+  }
+
+  .reloj { display: grid; gap: .55em; width: fit-content; }
+
+  .hora {
+    direction: ltr;
+    font-size: clamp(2.75rem, 21vmin, 11rem);
+    font-weight: 300;
+    line-height: .92;
+    letter-spacing: .01em;
+    display: flex;
+    align-items: baseline;
+    justify-content: center;
+    white-space: nowrap;
+  }
+  html[data-script="arabe"] .hora { line-height: 1.05; }
+  .d { display: inline-block; width: var(--dw, 1ch); text-align: center; }
+  .sep { display: inline-block; padding: 0 .04em; color: var(--suave); }
+  .seg, .periodo {
+    font-size: .34em;
+    letter-spacing: .06em;
+    color: var(--suave);
+    margin-left: .5em;
+    align-self: flex-start;
+    padding-top: .55em;
+  }
+  .periodo { margin-left: .35em; }
+
+  .minuto { height: 2px; background: var(--linea); border-radius: 2px; overflow: hidden; }
+  .minuto span { display: block; height: 100%; width: 0; background: var(--acento); }
+
+  .fecha {
+    margin: 0;
+    text-align: center;
+    font-family: ui-sans-serif, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    font-size: clamp(.72rem, 2.4vmin, .95rem);
+    font-weight: 400;
+    letter-spacing: .04em;
+    color: var(--suave);
+  }
+  html[data-script="arabe"] .fecha {
+    font-family: inherit;
+    font-size: clamp(.85rem, 3vmin, 1.2rem);
+    letter-spacing: 0;
+  }
+</style>
+</head>
+<body>
+  <main class="reloj">
+    <div class="hora" id="hora" role="timer" aria-live="off"></div>
+    <div class="minuto" aria-hidden="true"><span id="minuto"></span></div>
+    <p class="fecha" id="fecha"></p>
+  </main>
+
+<script>
+(function () {
+  var P = new URLSearchParams(location.search);
+  var tz = P.get('tz') || 'Europe/Madrid';
+  var lang = P.get('lang') || 'es-ES';
+  var cifras = P.get('numerals') || '';            // latn | arab | arabext
+  var h12 = (P.get('format') || '24') === '12';
+  var verSegundos = (P.get('seconds') || 'on') !== 'off';
+  var verFecha = (P.get('date') || 'on') !== 'off';
+  var lugar = P.get('label') || '';
+  var doc = document.documentElement;
+
+  doc.dataset.theme = ['light', 'dark', 'auto'].indexOf(P.get('theme')) > -1 ? P.get('theme') : 'auto';
+  if (P.get('bg') === 'none') doc.dataset.bg = 'none';
+  doc.lang = lang.slice(0, 2);
+
+  // El sistema de cifras viaja dentro del locale: es-ES-u-nu-arab, ar-u-nu-latn, etc.
+  var locale = lang + (/^(latn|arab|arabext)$/.test(cifras) ? '-u-nu-' + cifras : '');
+  try { new Intl.DateTimeFormat(locale, { timeZone: tz }).format(); }
+  catch (e) {
+    try { new Intl.DateTimeFormat(locale).format(); tz = Intl.DateTimeFormat().resolvedOptions().timeZone; }
+    catch (e2) { locale = 'es-ES'; tz = Intl.DateTimeFormat().resolvedOptions().timeZone; }
+  }
+
+  var nf = new Intl.NumberFormat(locale);
+  var setCifras = [0,1,2,3,4,5,6,7,8,9].map(function (n) { return nf.format(n); });
+  var cero = setCifras[0];
+  var esArabe = /[\u0660-\u0669\u06F0-\u06F9]/.test(setCifras.join(''));
+
+  if (esArabe) {
+    doc.dataset.script = 'arabe';
+    var f = document.createElement('link');
+    f.rel = 'stylesheet';
+    f.href = 'https://fonts.googleapis.com/css2?family=Amiri:wght@400&display=swap';
+    document.head.appendChild(f);
+  }
+
+  var fHora = new Intl.DateTimeFormat(locale, {
+    hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: h12, timeZone: tz
+  });
+  var fFecha = new Intl.DateTimeFormat(locale, {
+    weekday: 'long', day: 'numeric', month: 'long', timeZone: tz
+  });
+
+  var elHora = document.getElementById('hora');
+  var elMinuto = document.getElementById('minuto');
+  var elFecha = document.getElementById('fecha');
+  if (!verFecha) elFecha.remove();
+  else elFecha.dir = /^(ar|fa|ur|he)/.test(lang) ? 'rtl' : 'ltr';
+
+  var reducido = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  var ultimoSeg = -1, ultimaFecha = '';
+
+  // Los dígitos van en cajas de anchura fija para que la hora no baile al cambiar.
+  // La anchura se mide sobre la fuente real, así vale para 0-9 y para ٠-٩.
+  function medirAncho() {
+    var probe = document.createElement('span');
+    probe.style.cssText = 'position:absolute;visibility:hidden;white-space:pre;';
+    elHora.appendChild(probe);
+    var max = 0;
+    setCifras.forEach(function (d) {
+      probe.textContent = d;
+      max = Math.max(max, probe.getBoundingClientRect().width);
+    });
+    probe.remove();
+    if (max > 0) elHora.style.setProperty('--dw', max.toFixed(2) + 'px');
+  }
+
+  function rellenar(valor) {
+    var s = String(valor);
+    return s.length < 2 ? cero + s : s;
+  }
+
+  function partes(fecha) {
+    var out = {};
+    fHora.formatToParts(fecha).forEach(function (p) {
+      if (p.type !== 'literal') out[p.type] = p.value;
+    });
+    return out;
+  }
+
+  function cajas(texto) {
+    return Array.from(texto).map(function (c) {
+      var esDigito = setCifras.indexOf(c) > -1;
+      return '<span class="' + (esDigito ? 'd' : 'sep') + '">' + c + '</span>';
+    }).join('');
+  }
+
+  function pintar(ahora) {
+    var p = partes(ahora);
+    var hh = h12 ? p.hour : rellenar(p.hour);
+    var html = cajas(hh) + '<span class="sep">:</span>' + cajas(rellenar(p.minute));
+    if (verSegundos) html += '<span class="seg">' + rellenar(p.second) + '</span>';
+    if (h12 && p.dayPeriod) html += '<span class="periodo">' + p.dayPeriod + '</span>';
+    elHora.innerHTML = html;
+    elHora.setAttribute('aria-label', hh + ':' + p.minute);
+
+    if (verFecha) {
+      var texto = fFecha.format(ahora);
+      texto = texto.charAt(0).toUpperCase() + texto.slice(1);
+      if (lugar) texto = lugar + (elFecha.dir === 'rtl' ? '، ' : ', ') + texto.charAt(0).toLowerCase() + texto.slice(1);
+      if (texto !== ultimaFecha) { elFecha.textContent = texto; ultimaFecha = texto; }
+    }
+  }
+
+  function barra(ahora) {
+    var frac = (ahora.getSeconds() + (reducido ? 0 : ahora.getMilliseconds() / 1000)) / 60;
+    elMinuto.style.width = (frac * 100).toFixed(2) + '%';
+  }
+
+  function bucle() {
+    var ahora = new Date();
+    var s = ahora.getSeconds();
+    if (s !== ultimoSeg) { ultimoSeg = s; pintar(ahora); if (reducido) barra(ahora); }
+    if (!reducido) barra(ahora);
+    requestAnimationFrame(bucle);
+  }
+
+  medirAncho();
+  bucle();
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(medirAncho);
+  var t;
+  window.addEventListener('resize', function () { clearTimeout(t); t = setTimeout(medirAncho, 150); });
+})();
+</script>
+</body>
+</html>
